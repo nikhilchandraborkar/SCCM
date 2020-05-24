@@ -3,7 +3,7 @@
 #an example is shown below for the same
 #Populate the below Variables with dyamic data from your orchestrator workflow or set it statically in the code.
  
-$SCCMServer = "vwdcpv-msapp110.emea.vorwerk.org"
+$SCCMServer = "FQDN-SCCM-server"
 $SmsSiteCode = "PRI"
 $CollectionIDs = @("PRI000A0"
 "PRI0008A"
