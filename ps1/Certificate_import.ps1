@@ -1,0 +1,45 @@
+﻿#$storeName = "TrustedPublisher"
+$certString = "MIIFQDCCAyigAwIBAgIJALoj4OMsnb4CMA0GCSqGSIb3DQEBCwUAMDwxCzAJBgNV
+BAYTAlVTMQ4wDAYDVQQKEwVKQUZSQTEdMBsGA1UEAxMUU2VjdXJlIExvZ2luIFJv
+b3QgQ0EwHhcNMTcxMTAxMTYxNjE3WhcNMjcxMTAxMTYxNjE3WjA8MQswCQYDVQQG
+EwJVUzEOMAwGA1UEChMFSkFGUkExHTAbBgNVBAMTFFNlY3VyZSBMb2dpbiBSb290
+IENBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAoBvYvn+fZf/3QKEM
+dlNaUjlU/7Klync4Aj8zXBjkN18Ztpm0vyvSwGNBfjzsnuUVNmfZdxl/k+Mddo0C
+xvDRodHyaXr+BSFfUc0n3Cf6P5kshSM5d3rOQi895OeBwwTLymNe/11vJhuvAwNf
+rvA0TMYLfFc4zBvo3xYDoBEze1l34qdjhlMZLO3Cn4r4eKbLIgy2jP7i4SQQdgX8
+xT2cPHu7CtOVMDUR+o8xOpcS7HLNgKUBg35YhsFgDPiGKgfEUp9jOdFRR6CwrgPV
+j+ucNkTZlk5ZI0V1Nlwd+41+++ozzOz1s+hUmqw3TT6bmVnZqqHh2COmfGnLds/K
+C76sGW5txyd9pdQYVBu9k0G2CSMSAiHQYNH6vtV38OckmggTegOEhl5cepGsbNNP
+RBu4pTdlF9qt1Gw1jqBqvSlS02ZLgGh2dTDynYQmvW/BJ/tNaRl85q6V84pT5B9Z
+ExqHPeJDCtw+HbAjz8WAGYdexw5ba9fyN/48qZAFNJMeQm+MHXNgixwZr79Edr84
+WNG6jA42oe+SRBRm8QKXsT39ASbrfHpkqKpDMxHToYT3xsGzl1g/GLQdQyyXEMBq
+5OJFyCaypSVHQn4iGEGv1qHD/jDl7o5Fx3z+bpS3KF84+9Tm7ulOT50LhzYbZXAI
+nDf6cXbSmPrkLI9QEdCzbAt6cakCAwEAAaNFMEMwDgYDVR0PAQH/BAQDAgIEMBIG
+A1UdEwEB/wQIMAYBAf8CAQEwHQYDVR0OBBYEFOASq9gexWPRVYBJmaMG+H5Tp7o5
+MA0GCSqGSIb3DQEBCwUAA4ICAQAw0GiHSiwjTjcQE86cuF85KsbZB3QmNHgwSXty
+SCDkjLYjYWP2jdJBn6hl8MJElG3t/S3KIRwTS1J3CVGYwbhDwZM1gCsCY4CKWcdx
+X/9VpYHXZQDFQnfz6ZVVwQ/BlAGUzDPtqCU/+bpvuOJqRGg86jL9HsNdbJ/iXAbj
+s2IIJm2htBp7OB9aoyyLW/UEYLM7sJnmAo3l3qXwX9KfxRcCzXizxhHEHs8CYhfe
+q3PdxIVmUXoGMKnoiYcPEAZlAqsYODIQWo6bV27Or8hlfeuOJghfs0tLI9MBUIqC
+RMmXWdfOcFE7DZ/EP4rQm3M5cPgJoL7KSuLmXvBm4KCixfjPXBGf5cf6z9vb7/Dp
+SJW67ZYYW27Bf1/fqXe/igXrKtmUIQSLiRF2zkBfmc/SUn2VlagBv/ZMySbADH73
+rjYW0o3k6i14RvR3rUlnIHw25OzWpF7Rb+cR5QlGVbYaP1LH2tl5zU2+PpN9oEcd
+7KsLiW2wGjzAFGbLi5NmYC3I2YwYlfZlPSmXnYEOgHGkkkF/BYYYamICx8oX/Duo
+RsK7JT3ae6XHOkGsbHZ3Ib7kb0iw7XOd2PCYvXYb4WvgdYWQ6b741L0Jdcy2UN0m
+zsE4ZaatkVCPBVQHgeLMb18HydM4A2bzevPUzEZ5nyFt7y9EAS8R3XqJQVPacyCA
+pXvAOA=="
+ 
+$store = New-Object System.Security.Cryptography.X509Certificates.X509Store Root, LocalMachine
+$store1 = New-Object System.Security.Cryptography.X509Certificates.X509Store Root, CurrentUser
+$store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+$store1.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) 
+$certByteArray = [System.Convert]::FromBase64String($certString)
+
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+$cert.Import($certByteArray)
+ 
+$store.Add($cert)
+$store1.Add($cert)
+
+$store.Close()
+$store1.Close()
