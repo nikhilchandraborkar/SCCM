@@ -1,6 +1,6 @@
 
 
-select * from information_schema.tables
+0. select * from information_schema.tables
 
 1. Get the name of the application from SCCM and run below report- 
 
