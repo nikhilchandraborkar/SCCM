@@ -4,7 +4,7 @@ $InstDir = Split-Path -parent $MyInvocation.MyCommand.Definition
 #Getting Current directory for the script
 
 
-$logFile = "C:\Windows\FNMA\Logs\AdobeAcrobatReaderDC_17.009.20044_Wrapper.log"
+$logFile = "C:\Windows\Logs\AdobeAcrobatReaderDC_17.009.20044_Wrapper.log"
 $Component = "Installation"
 
 Function LogWrite {
