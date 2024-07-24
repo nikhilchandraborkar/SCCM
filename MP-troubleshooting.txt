@@ -104,6 +104,9 @@ robocopy E:\SMS\MP\OUTBOXES\statemsg.box.old\ to \\sjc4sccmprip01.corp.service-n
 
 mt - multi thread count
 
+$CMPath = Get-ItemPropertyValue 'HKLM:\SOFTWARE\Microsoft\SMS\Setup' -Name 'Installation Directory'
+Get-ChildItem $CMPath\inboxes -recurse | Where {!$_.PSIsContainer} | Group Directory | Format-Table Name, Count -autosize
+
 *********************************************
 
 State message backlog
