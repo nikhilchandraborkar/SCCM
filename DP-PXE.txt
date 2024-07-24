@@ -1,0 +1,59 @@
+if((Test-Path -LiteralPath "HKLM:\SOFTWARE\Microsoft\SMS\DP") -ne $true) {  New-Item "HKLM:\SOFTWARE\Microsoft\SMS\DP" -force -ea SilentlyContinue };
+ 
+if((Test-Path -LiteralPath "HKLM:\SOFTWARE\Microsoft\SMS\DP\Logging\@GLOBAL") -ne $true) {  New-Item "HKLM:\SOFTWARE\Microsoft\SMS\DP\Logging\@GLOBAL" -force -ea SilentlyContinue };
+ 
+New-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\SMS\DP' -Name 'RamDiskTFTPWindowSize' -Value 8 -PropertyType DWord -Force -ea SilentlyContinue;
+ 
+New-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\SMS\DP' -Name 'RamdiskTFTPBlockSize' -Value 16384 -PropertyType DWord -Force -ea SilentlyContinue;
+ 
+New-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\SMS\DP\Logging\@GLOBAL' -Name 'LogMaxSize' -Value 10485760 -PropertyType DWord -Force -ea SilentlyContinue;
+ 
+New-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\SMS\DP\Logging\@GLOBAL' -Name 'LogMaxHistory' -Value 10 -PropertyType DWord -Force -ea SilentlyContinue;
+ 
+New-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\SMS\DP\Logging\@GLOBAL' -Name 'LogLevel' -Value 0 -PropertyType DWord -Force -ea SilentlyContinue;
+
+
+
+How to clear the Distribution Point Configuration Status from console
+ 
+\Monitoring\Overview\Distribution Status\Distribution Point Configuration Status
+ 
+General Flow:
+ 
+Scalar function fnGetDPLastMessageState is triggered and compiles data from vSMS_DPStatusDetails
+ 
+vSMS_DPStatusDetails is dependent upon the following tables: DistributionStatus, ContentDistributionMessages and ContentDistributionByDP
+ 
+ 
+To reset or change the status of any DP in Distribution Point Configuration Status in Monitoring, review the following:
+ 
+ 
+--Messages related to DP configuration status
+select * from DistributionStatus
+ 
+--Add the DP name between the % symbols below
+delete Distributionstatus where DPNALPath like '%%'
+ 
+ 
+--Take note of the DPID
+select * from DistributionPoints
+ 
+ 
+--Package status messages for each DP
+select * from ContentDistributionMessages
+ 
+--Clear the detailed messages
+delete ContentDistributionMessages where DPID ='ID of DP'
+ 
+ 
+--Package status details for each DP
+select * from ContentDistributionByDP
+ 
+--Clear error state from the summarization chart
+update ContentDistributionbyDP set NumberErrors = '0' where DPID = 'ID of DP'
+ 
+--Clear 'in progress' from the summarization chart
+update ContentDistributionbyDP set NumberInProgress = '0' where DPID = 'ID of DP'
+ 
+--'Number Installed' column needs to match the 'Number Total'
+update ContentDistributionbyDP set NumberInstalled = 'Number Total' where DPID = 'ID of DP'

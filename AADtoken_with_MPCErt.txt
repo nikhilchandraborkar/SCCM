@@ -1,0 +1,108 @@
+<#
+Title:
+======
+This is newer version of original AADTokenScript, For versions older than 2017 use older script.
+
+#>
+
+$Authority = "https://login.microsoftonline.com/common/oauth2/token"
+$WebAccountProviderId = "https://login.windows.net"
+
+# Ensure script is executed elevated
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(0x220)) {
+    Write-Host "The script has to be executed as administrator (elevated)!" -ForegroundColor Yellow
+ break
+}
+
+
+try { 
+	$AADCCMKey = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\CCM\AADConfigs' -ErrorAction Stop
+}
+catch {
+    Write-Host "HKLM:\SOFTWARE\Microsoft\CCM\AADConfigs Missing "-ForegroundColor Red
+    Write-Host "The ConfigMgr Client doesn't have the AAD Policy yet" -ForegroundColor Red
+    Break
+}
+
+
+$isUserAAD = dsregcmd /status | Where-Object{ $_.contains("AzureAdPrt : YES") }
+if ($isUserAAD)
+{
+    $UserSID = ([System.Security.Principal.WindowsIdentity]::GetCurrent()).User.Value
+}
+else
+{
+    Write-Host "Non-AAD User"
+    THROW "Only works if user is in AAD (AADJOIN\Hybrid)"
+}
+
+ 
+write-host "Attempting to authenticate to service" -ForegroundColor Green
+
+
+Try
+{
+    $AADUserToken = Invoke-WmiMethod -Namespace root\CCM\ClientSDK -class CCM_SoftwareCatalogUtilities -Name GetAADUserToken |  Select-Object UserToken -ExpandProperty UserToken
+    
+    if ($AADUserToken)
+    {
+        Write-Host "The AAD User Token for $UserSID obtained Successfully!!!" -ForegroundColor Magenta
+        Write-Host "AAD Token: `n $AADUserToken" -ForegroundColor Yellow
+    }
+}
+Catch
+{
+    write-host "Fatal error encountered see:CCMCloud.log for more information" -ForegroundColor Red
+}
+
+
+try { 
+	$CCMKey = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\CCM' -ErrorAction Stop
+}
+catch {
+    Write-Host "HKLM:\SOFTWARE\Microsoft\CCM Missing or Access issues "-ForegroundColor Red
+    Break
+}
+
+$CMGFQDNs = $CCMKey.CMGFQDNs.split(';')
+#$InternetMP = $InternetMPUrlKey."Internet MP Hostname".split('/')
+
+$ActiveMps = Get-WmiObject -namespace "root\ccm\locationservices" -query "select * from SMS_ActiveMPCandidate" | Select-object -ExpandProperty MP -ErrorAction Stop
+
+foreach($CMGFQDN in $CMGFQDNs){
+
+ foreach ($ActiveMp in $ActiveMps)
+ {
+  $ActiveMp = $ActiveMp.split('/')
+
+ if ($ActiveMp[0].equals($CMGFQDN))
+    {
+    $roleID= $ActiveMp[($ActiveMp.count-1)]
+    $headers = @{ Authorization = "Bearer $AADUserToken" }
+    Write-Host "`nTrying https://$CMGFQDN/CCM_Proxy_ServerAuth/ServiceMetadata" -ForegroundColor Magenta
+    Invoke-WebRequest -uri "https://$CMGFQDN/CCM_Proxy_ServerAuth/ServiceMetadata" -Headers $headers -UseBasicParsing 
+
+    Write-Host "Trying to get CCMToken from https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/CCM_STS" -ForegroundColor Magenta
+    $STSresponse = Invoke-WebRequest -uri "https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/CCM_STS" -Headers $headers -UseBasicParsing -TimeoutSec 30
+    $ccmtoken = ($STSresponse.Content | ConvertFrom-Json).access_token
+    if ($ccmtoken -ne $NULL)
+    {
+    Write-Host "`nCCMToken obtained: $ccmtoken" -ForegroundColor Yellow
+    }
+    else
+    {
+        Write-Host "`nCouldn't obtain CCMToken from AADToken. Check if your are able to reach the CCM_STS endpoint on the MP and CCM_STS.log for more details." -ForegroundColor Yellow
+    }
+
+    $headers1 = @{ Authorization = "Bearer $ccmtoken" }
+    Write-Host "`nTrying MPLIST Check on https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?MPLIST with the CCMToken obtained" -ForegroundColor Magenta
+    Invoke-WebRequest -uri "https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?MPLIST" -Headers $headers1 -UseBasicParsing -TimeoutSec 30
+     Write-Host "`nTrying MPLIST Check on https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?sitesigncert with the CCMToken obtained" -ForegroundColor Magenta
+    Invoke-WebRequest -uri "https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?sitesigncert" -Headers $headers1 -UseBasicParsing -TimeoutSec 30
+         Write-Host "`nTrying MPLIST Check on https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?MPCERT with the CCMToken obtained" -ForegroundColor Magenta
+    Invoke-WebRequest -uri "https://$CMGFQDN/CCM_Proxy_ServerAuth/$roleID/SMS_MP/.sms_aut?MPCERT" -Headers $headers1 -UseBasicParsing -TimeoutSec 30
+    }
+
+}
+
+}

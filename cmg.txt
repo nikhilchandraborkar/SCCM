@@ -1,0 +1,154 @@
+SELECT State, ConfigurationVersion FROM SMS_AzureService WHERE ServiceCName = 'mfamscmg.cloudapp.net'
+
+
+Get-WmiObject -Namespace root\sms\site_CSO -Query 'SELECT State, ConfigurationVersion FROM SMS_AzureService WHERE ServiceCName = 'mfamscmg.cloudapp.net''
+
+************************************************
+
+update Azure_Service set state = '0'
+
+************************************************
+
+
+ccmsetup.exe /mp:ybwp2pemmgp0001.ess.fiserv.one SMSSITECODE=PS2 SMSMP=ybwp2pemmgp0001.ess.fiserv.one /BITSPriority:High /noCRLcheck RESETKEYINFORMATION=TRUE
+
+
+
+
+**************************************
+
+SELECT NormalizedTimeStamp AS TimeStamp, SUM(InternetOnlineClients) AS InternetOnlineClients, SUM(IntranetOnlineClients) AS IntranetOnlineClients, 
+SUM(CMGOnlineClients) AS CMGOnlineClients FROM(SELECT DATEADD(hour, DATEDIFF(hour, 0, TimeStamp), 0) AS NormalizedTimeStamp, InternetOnlineClients, 
+IntranetOnlineClients, CMGOnlineClients FROM (SELECT * FROM BGB_Statistics) BGB ) temp
+WHERE NormalizedTimeStamp > DATEADD(DD, -30, GETUTCDATE()) GROUP BY NormalizedTimeStamp ORDER BY NormalizedTimeStamp DESC
+
+************************************************
+
+$CMGNAME = "cmgcso.cloudapp.net"
+$ThumbPrint = "7AF35612B19393333A2A6FCE7B81BC4822D69062"
+$RoleID = ""
+Invoke-WebRequest -Uri "https://$CMGNAME" -UseBasicParsing
+# Test website (expect 403) - Client
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+#Test ServiceMetadata site
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$Cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where {$_.Thumbprint -like $ThumbPrint}
+Invoke-WebRequest -Uri "https://$CMGNAME/CCM_Proxy_MutualAuth/ServiceMetadata" -Certificate $Cert -UseBasicParsing
+
+************************************************
+
+SELECT AE.ID, AE.ClientID, AE.Name [App Name], AE.IsClientApp, AE.IdentifierUri,
+AER.IsTombstoned, ACS.Name [Azure Service Name]
+FROM AAD_Application_Ex AE
+LEFT JOIN AAD_CloudServiceApplicationRelations AER ON AER.AADApplicationID = AE.ID
+LEFT JOIN Azure_CloudService ACS ON ACS.ID = AER.ID
+
+
+
+************************************************
+storage#######
+************************************************
+  $ports = 443
+  $cmgname = 'corcmg.table.core.windows.net'
+  $ports | ForEach-Object {$port = $_;(Test-NetConnection $cmgname -Port $port) }
+
+$ports = 443
+  $cmgname = 'corcmg.blob.core.windows.net'
+  $ports | ForEach-Object {$port = $_;(Test-NetConnection $cmgname -Port $port) }
+$ports = 443
+  $cmgname = 'corcmg.vault.azure.net'
+  $ports | ForEach-Object {$port = $_;(Test-NetConnection $cmgname -Port $port) }
+
+
+
+************************************************
+
+$endpoint ='aka.ms','manage.microsoft.com','dc.visualstudio.com','graph.windows.net',
+'go.microsoft.com','management.azure.com','login.microsoftonline.com','aadcdn.msauth.net',
+'aadcdn.msftauth.net','configmgrbits.azureedge.net','login.live.com','login.windows.net',
+'account.live.com','clientconfig.passport.net','gateway.configmgr.manage.microsoft.com'
+foreach ($i in $endpoint) {
+$Result = (Test-NetConnection $i -Port 443).TcpTestSucceeded
+if ($Result -eq $True) {
+         Write-Host "Connection to $i ...... passed/Warning" -ForegroundColor green
+    } else {
+        Write-Host "Connection to $i .......... Failed" -ForegroundColor Red }
+    }
+
+
+************************************************
+
+select * from vProxy_RoleEndpoints where RoleName like '%Management Point%'
+
+************************************************
+
+
+$CMGNAME = "SCCMCMG02PRODWEST.NOKIA.COM"
+$ThumbPrint = ""
+$RoleID = "72057594037938125"
+$Cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where {$_.Thumbprint -like $ThumbPrint}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Write-Host "CMG home page request should return 500..."
+Invoke-WebRequest -Uri "https://$CMGNAME" -UseBasicParsing -Certificate $Cert | fl *
+Write-Host "Performing servicemetadata web request..."
+Invoke-WebRequest -Uri "https://$CMGNAME/CCM_Proxy_MutualAuth/ServiceMetadata" -Certificate $Cert -UseBasicParsing | fl *
+Write-Host "Performing mplist web request..."
+Invoke-WebRequest "https://$CMGNAME/CCM_Proxy_MutualAuth/$RoleID/SMS_MP/.sms_aut?MPLIST" -Certificate $Cert -UseBasicParsing | fl *
+Write-Host "Performing mplist web request..."
+Invoke-WebRequest "https://$CMGNAME/CCM_Proxy_MutualAuth/$RoleID/SMS_MP/.sms_aut?MPCERT" -Certificate $Cert -UseBasicParsing | fl *
+Write-Host "Performing mplist site signing  request..."
+Invoke-WebRequest "https://$CMGNAME/CCM_Proxy_MutualAuth/$RoleID/Sms_mp/.sms_aut?sitesigncert" -Certificate $Cert -UseBasicParsing | fl *
+
+
+********************************************
+
+$Encrypted= ConvertTo-SecureString "Norturacmg" -AsPlainText -Force
+New-CMCloudManagementGateway -GroupName 'Nortura_CMG' -ServerAppClientId '75c148aa-3ec7-48d3-bc7e-2813467347bc' -ServiceCertPath "C:\temp\CMG Cert 12.27.2023\Norturacmg.pfx" -ServiceCertPassword $Encrypted -SubscriptionId '886c43b3-dd4e-4743-a8c6-a53e6d9cd276' -VMSSVMSize StandardB2S -VMInstanceCount 1 -EnableCloudDPFunction $True -CheckClientCertRevocation $false -Region WestEurope
+
+
+
+***********************************************
+
+
+Step 1 - Confirm that the desired apps are no longer connective to an Azure service
+
+SELECT AE.ID, AE.ClientID, AE.Name [App Name], AE.IsClientApp, AE.IdentifierUri,
+AER.IsTombstoned, ACS.Name [Azure Service Name]
+FROM AAD_Application_Ex AE
+LEFT JOIN AAD_CloudServiceApplicationRelations AER ON AER.AADApplicationID = AE.ID
+LEFT JOIN Azure_CloudService ACS ON ACS.ID = AER.ID
+
+Step 2 - Identify ClientID of the applications to be removed
+Select * from aad_applications_ex
+Copy the 'ClientID' value and paste into notepad to build later query. 
+
+Step 3 - Delete
+Delete from AAD_Application_EX where ClientID = ''
+
+*****************************************************
+
+
+Select * from Azure_Service
+
+to make it stopped state
+
+update Azure_Service set state=6 where AzureServiceID=16777226
+
+1 is for dual facto screen show up, 2 is for sign in screen
+
+Update AAD_Application_Ex set source = 1 where ID='16777217'
+
+******************************
+
+client side CMG propeties from WMI
+gwmi -ns ROOT\ccm\Policy\Machine\ActualConfig -class CCM_CloudClientConfig 
+
+
+
+
+*****************************
+
+Select * from Azure_Service
+Select * from sysreslist
+Select * from sc_sysresuse
+ 

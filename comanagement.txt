@@ -1,0 +1,33 @@
+$EnrollmentsPath = "HKLM:\SOFTWARE\Microsoft\Enrollments\"
+$Enrollments = Get-ChildItem -Path $EnrollmentsPath
+Foreach ($Enrollment in $Enrollments)
+{
+$EnrollmentObject = Get-ItemProperty Registry::$Enrollment
+if ($EnrollmentObject."DiscoveryServiceFullURL" -eq 'https://enrollment.manage.microsoft.com/enrollmentserver/discovery.svc')
+{
+$EnrollmentPath = $EnrollmentsPath + $EnrollmentObject."PSChildName"
+Remove-Item -Path $EnrollmentPath -Recurse
+}
+}
+Restart-Service ccmexec
+
+
+***********************************
+
+
+Open an elevated Windows Powershell window
+Change the directory to a location you have easily access to (i.e. cd C:\temp)
+ 
+Run the following command which downloads the Intune.xml file
+wget https://aka.ms/intunexml -outfile Intune.xml
+ 
+Run the following command which downloads the Powershell script
+wget https://aka.ms/intuneps1 -outfile IntuneODCStandAlone.ps1
+ 
+Run the following command which runs the downloaded Powershell script against the XML file.
+powerShell -ExecutionPolicy Bypass -File .\IntuneODCStandAlone.ps1
+ 
+The last command will generate the logs file in the location which you specified in the first command
+
+
+/*******************************************/

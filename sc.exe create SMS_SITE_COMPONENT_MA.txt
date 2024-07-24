@@ -1,0 +1,2 @@
+sc.exe create SMS_SITE_COMPONENT_MANAGER binpath= "D:\Program Files\Microsoft Configuration Manager\bin\X64\sitecomp.exe"
+

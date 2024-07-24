@@ -1,0 +1,24 @@
+--DDR resend
+Invoke-WmiMethod -Namespace "root\ccm" -Class "SMS_Client" -Name "TriggerSchedule" -ArgumentList "{00000000-0000-0000-0000-000000000003}"
+
+--HW 
+
+Invoke-WmiMethod -Namespace "root\ccm" -Class "SMS_Client" -Name "TriggerSchedule" -ArgumentList "{00000000-0000-0000-0000-000000000001}"
+
+
+$portvalue = 33389
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "PortNumber" -Value $portvalue
+New-NetFirewallRule -DisplayName 'RDPPORTLatest-TCP-In' -Profile 'Any' -Direction Inbound -Action Allow -Protocol TCP -LocalPort $portvalue
+New-NetFirewallRule -DisplayName 'RDPPORTLatest-UDP-In' -Profile 'Any' -Direction Inbound -Action Allow -Protocol UDP -LocalPort $portvalue
+
+ 
+ 
+# Current Port #:
+Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "PortNumber"
+
+
+# Remove the existing hardware inventory action status
+Get-WmiObject -Namespace root\ccm\invagt -Class inventoryactionstatus | Where-Object {$_.inventoryactionid -eq "{00000000-0000-0000-0000-000000000001}"} | Remove-WmiObject
+
+# Trigger a full hardware inventory
+Invoke-WMIMethod -Namespace root\ccm -Class SMS_CLIENT -Name TriggerSchedule "{00000000-0000-0000-0000-000000000001}"

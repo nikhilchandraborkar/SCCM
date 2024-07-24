@@ -1,0 +1,119 @@
+--Devices currently online per MP
+ 
+select srl.SiteCode, srl.ServerName, srl.InternetEnabled, srl.Shared, srl.SslState,
+SUM(brs.OnlineStatus) AS OnlineClients, bs.ReportTime from SysResList srl
+inner join BGB_Server bs ON srl.ServerName = bs.ServerName
+inner join BGB_ResStatus brs ON bs.ServerID = brs.ServerID
+where RoleName='SMS Management Point'
+group by srl.SiteCode, srl.ServerName, srl.InternetEnabled, srl.Shared, srl.SslState, bs.ReportTime
+
+
+*****************************************
+
+Select * from vProxy_RoleEndpoints where RoleName like '%Management Point%'
+
+
+
+*****************************************
+--Verbose powershell for MP
+
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogLevel" -Value "0" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxSize" -Value "10485760" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxHistory" -Value "10" -ErrorAction SilentlyContinue
+New-Item -Path "HKLM:\Software\Microsoft\CCM\Logging\DebugLogging" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\DebugLogging' -Name "Enabled" -Value "True" -ErrorAction SilentlyContinue
+Stop-Service -Name CcmExec
+Start-Service -Name CcmExec
+Stop-Service -Name W3SVC
+Start-Service -Name W3SVC
+
+*******************************
+-- clients with MP
+
+SELECT UPPER(LastMPServerName) AS 'Management Point', COUNT(distinct ResourceID) AS 'Total Clients'    FROM v_CH_ClientSummary where LastMPServerName != '' group by LastMPServerName
+
+
+********************************
+netstat -ano| findstr /I "Established" | find /c":80"
+
+Get-Counter -Counter "\Web Service(*)\Current Connections"
+
+*********************************************
+mp policy storm troubleshooting
+
+# threads should be below 200 (on powerful server)
+Write-host "Current CCMexec Thread Count" -ForegroundColor Red
+Get-Process ccmexec | Select-Object -ExpandProperty Threads | Measure
+ 
+
+# concurrent count should be below 500 (on powerful server)
+Write-host "Current Connection Count"  -ForegroundColor Red
+Get-Counter -Counter "\Web Service(*)\Current Connections"
+
+*******************************************************
+
+#read IIS log
+$iisLog = "C:\InetPub\Logs\LogFiles\W3SVC1\u_ex$(Get-Date -F 'yyMMdd').log"
+$numOfRecords = 10000
+$headers = @((Get-Content -Path $iisLog -ReadCount 4 -TotalCount 4)[3].split(' ') | `
+Where-Object { $_ -ne '#Fields:' })
+Get-Content $iisLog -Tail $numOfRecords | Where-Object { $_.date -notlike '#*' } | `
+Out-File "${$env:TEMP}\last${$numOfRecords}Entries.csv" -Force
+Import-Csv -Delimiter ' ' -Header $headers -Path "${$env:TEMP}\last${$numOfRecords}Entries.csv" | `
+sort time -Descending | Out-GridView -Title "IIS log: $iisLog"
+
+
+**********************************************************
+
+$iisLog = "C:\InetPub\Logs\LogFiles\W3SVC1\u_ex$(Get-Date -F 'yyMMdd').log"
+$numOfRecords = 1000
+$ipAddress = '10.50.33.150'
+$headers = @((Get-Content -Path $iisLog -ReadCount 4 -TotalCount 4)[3].split(' ') | `
+Where-Object { $_ -ne '#Fields:' })
+Get-Content $iisLog -Tail $numOfRecords | Where-Object { $_.date -notlike '#*' } | `
+Out-File "${$env:TEMP}\last${$numOfRecords}Entries.csv" -Force
+Import-Csv -Delimiter ' ' -Header $headers -Path "${$env:TEMP}\last${$numOfRecords}Entries.csv" | `
+? { $($_.'c-ip') -eq $ipAddress } |
+sort time -Descending | Out-GridView -Title "IIS log: $iisLog"
+
+******************************************************************
+
+http://dc2prsmsvmp0007.es.ad.adp.com/sms_mp/.sms_aut?mplist
+https://xxxx/sms_mp/.sms_aut?mpcert
+https://xxxx/sms_mp/.sms_aut?MPKEYINFORMATION
+
+****************************************************************
+
+MP IIS 403 errors (verify there are certs that are not issued to and issued by are not same)
+
+Get-Childitem cert:\LocalMachine\root -Recurse | Where-Object {$_.Issuer -ne $_.Subject} | Format-List
+
+
+************************************************************
+
+re-register the client
+
+Remove-Item Cert:\LocalMachine\SMS\* -Force
+Remove-Item C:\Windows\SMSCFG.ini -Force
+Restart-Service ccmexec
+
+
+*******************************************
+
+robocopy E:\SMS\MP\OUTBOXES\statemsg.box.old\ to \\sjc4sccmprip01.corp.service-now.com\SMS_SJC\inboxes\auth\statesys.box\incoming\ *.smx /mov /mt:16
+
+mt - multi thread count
+
+*********************************************
+
+State message backlog
+
+$i = 0
+while ($i -eq 0) { write-host "outbox current count: " (get-childitem E:\SMS\MP\OUTBOXES\ -Recurse -File).count; sleep 10 }
+
+Get-ChildItem "E:\Program Files\Microsoft Configuration Manager\inboxes" -recurse | Where {!$_.PSIsContainer} |Group Directory | Format-Table Name, Count –autosize
+
+*****************************************
+
+
+(Get-WmiObject -Namespace Root\Ccm\LocationServices -Class SMS_ActiveMPCandidate | Where-Object {$_.Type -eq "Internet"}).MP

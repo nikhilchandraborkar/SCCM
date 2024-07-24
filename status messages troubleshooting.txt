@@ -1,0 +1,21 @@
+I will ask them to check for new messages using this to see how many messages are coming in daily-
+
+select count (*) from StatusMessages
+WHERE CONVERT(DATETIME, FLOOR(CONVERT(FLOAT, Time))) > '2023-7-02'
+
+
+
+
+
+Run the two following queries to get an idea what the top ten status messages are comprised of:  
+
+ select top 10 MessageID, component, count(*) as NumberOfStatusMessages from vStatusMessages group by MessageID, component order by count(*) desc
+
+ select top 10 ID, win32error, count (*) as NumberOfStatusMessages from StatusMessages group by ID, win32error order by count (*) desc
+
+
+
+
+ Next we need to find the specific Status Message IDs, by comparing the return values of this query and the one below we can "figure out" what the ID value is translated to in statusmessages table vs the regular MessageId value in Vstatusmessages view. We need this value translated because Status Messages are not shown as firendly IDs (i.e. 2301) in the StatusMessages table and the deletion needs to occur from the StatusMessages table so the correct SQL Triggers will fire.
+
+

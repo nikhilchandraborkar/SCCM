@@ -1,0 +1,9 @@
+Update PUBLIC_VIEWS.vUpdate Set isDeclined = '1' where UpdateId = '7a7866a3-6928-48a7-91fa-3aa24ce33e24'
+
+
+select * from PUBLIC_VIEWS.vUpdate where updateID = 'df2e608a-2c8f-4f12-8e98-147f6b955932'
+
+select * from vwminimalupdate where updateID = 'df2e608a-2c8f-4f12-8e98-147f6b955932'
+
+
+update vwminimalupdate Set isDeclined = '1' where UpdateId = 'df2e608a-2c8f-4f12-8e98-147f6b955932'

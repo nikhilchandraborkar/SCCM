@@ -1,0 +1,4 @@
+SELECT dbo.fnCurrentSiteVersion()
+SELECT dbo.fnCurrentSiteVersion_INT()
+Select dbo.fnSetupFullVersion()
+select * from sites

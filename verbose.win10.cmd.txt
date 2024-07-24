@@ -1,0 +1,106 @@
+@echo off
+REM
+REM External facing script.
+REM Enable verbose Windows Update ETL tracing.
+REM
+
+if "%~1"=="/?" (
+    goto USAGE
+)
+
+REM Check for admin permission
+FOR /f "usebackq" %%f IN (`whoami /priv`) DO IF "%%f"=="SeTakeOwnershipPrivilege" GOTO :IS_ADMIN
+ECHO CreateObject("Shell.Application").ShellExecute Chr(34) ^& "%WINDIR%\System32\cmd.exe" ^& Chr(34), "/K " ^& Chr(34) ^& "%~dpfx0 %*" ^& Chr(34), "", "runas", 1 >"%TEMP%\RunAs.vbs"
+WScript.exe "%TEMP%\RunAs.vbs"
+GOTO :EOF
+
+:IS_ADMIN
+setlocal
+set _DISABLE=0
+
+:ARGLOOP
+if "%~1"=="" (
+    goto START
+)
+
+if /I "%~1"=="/disable" (
+    set _DISABLE=1
+)
+
+shift
+goto ARGLOOP
+
+:START
+REM OS Version checks
+for /f "skip=1 tokens=2 delims=[]" %%G in ('ver') Do (
+  for /f "tokens=2,3,4 delims=. " %%x in ("%%G") Do (
+    set _major=%%x& set _minor=%%y& set _build=%%z 
+  )
+)
+
+IF %_major% LSS 10 (
+    echo This script is for Windows 10 or later only.
+    goto END
+)
+
+set _TRACEKEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Trace
+
+@echo.
+
+if %_DISABLE% == 1 (
+
+    echo Disabling WU verbose logging ...
+    @echo.
+    
+    reg delete %_TRACEKEY% /f
+
+) else (
+
+    echo Enabling WU verbose logging ...
+    @echo.
+
+    REM Trace level = Verbose
+    reg add %_TRACEKEY% /v Level /d 5 /t REG_DWORD /f
+
+    REM ETW buffer size = 1024 KB
+    REM This translates to flushing about every 3 MB
+    reg add %_TRACEKEY% /v BufferSize /d 512 /t REG_DWORD /f
+
+    REM Max individual ETL file size = 6144 KB (6 MB)
+    reg add %_TRACEKEY% /v MaxFileSize /d 6144 /t REG_DWORD /f
+
+    REM Max WU ETL folder size = 104857600 bytes (100 MB)
+    REM Default is 2MB, which won't be enough for verbose tracing.
+    reg add %_TRACEKEY% /v MaxLogFolderSize /d 104857600 /t REG_DWORD /f
+)
+
+@echo.
+echo Restarting WU services ...
+@echo.
+
+net stop usosvc
+net stop usosvc
+net stop wuauserv
+net stop wuauserv
+
+@echo.
+echo Done.
+
+goto END
+
+:USAGE
+@echo.
+echo verbosewu.win10.cmd [/disable]
+@echo.
+echo Enable Windows Update verbose tracing. 
+echo The trace will be output to regular location at %windir%\logs\WindowsUpdate
+@echo.
+echo Warning: This script will restart WU related services.
+@echo.
+echo Options:
+echo    /disable      Disable verbose tracing.
+@echo.
+goto :EOF
+
+:END
+endlocal

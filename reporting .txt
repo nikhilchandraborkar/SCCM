@@ -1,0 +1,4 @@
+**backup all the reports in reporting 
+
+Invoke-Expression (Invoke-WebRequest https://aka.ms/rstools)
+Out-RsRestFolderContent -ReportPortalUri 'http://ix1sccmdb/reports' -Recurse -RsFolder '/' -Destination 'C:\temp\export'

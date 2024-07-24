@@ -1,0 +1,119 @@
+#Troubleshoot Win Updates
+# ISE tip -- F8 = run highlighted text
+
+# 1\ enable ccm verbose
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogLevel" -Value "0" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxSize" -Value "10485760" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxHistory" -Value "10" -ErrorAction SilentlyContinue
+New-Item -Path "HKLM:\Software\Microsoft\CCM\Logging\DebugLogging" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\DebugLogging' -Name "Enabled" -Value "True" -ErrorAction SilentlyContinue
+Stop-Service -Name CcmExec
+Start-Service -Name CcmExec
+
+# 2\ perform verbose win update scan
+# equiv to
+#  reg add %_TRACEREGKEY% /v %_TRACEREGVALUE% /d 1 /t REG_DWORD /f
+#  set _TRACEREGKEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Trace
+#  set _TRACEREGVALUE=WPPLogDisabled
+Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Trace' -Name "WPPLogDisabled" -Value "1" -ErrorAction SilentlyContinue
+
+# stop some services
+Stop-Service CcmExec, usosvc, wuauserv -Force
+# make sure they are stopped
+Get-Service CcmExec, usosvc, wuauserv
+
+# start winupdate verbose trace
+saps 'logman' 'start WindowsUpdateLOGPS1 -o c:\windows\temp\winupdate.etl -ets -ft 00:00:05 -nb 2 24 -bs 128 -p {0b7a6f19-47c4-454e-8c5c-e868d637e4d8} 8380415 5' -NoNewWindow
+# confirm its running
+logman query WindowsUpdateLOGPS1 -ets
+
+# restart services
+Start-Service CcmExec, usosvc, wuauserv
+
+# kick off scan via ccmexec action
+Invoke-WMIMethod -Namespace root\ccm -Class SMS_CLIENT -Name TriggerSchedule "{00000000-0000-0000-0000-000000000113}"
+Get-Content C:\windows\ccm\logs\WUAHandler.log -Tail 10
+
+# stop the trace after scan is complete.. check wuahandler
+logman stop WindowsUpdateLOGPS1 -ets
+explorer c:\windows\temp
+
+# 3\ check for successful scans in wuahandler
+$ret = Get-Content 'C:\Windows\CCM\Logs\WUAHandler.log' | `
+? { $_ -match 'Successfully completed scan.' } | `
+#select -Last 1 | `
+ogv
+
+# 4\ check lgpo reg values
+Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate
+Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU
+
+# 5\ tnc against wsus server port
+$wsusAddress = ( ( (Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate).WUServer -split '//')[1] -split ':' )[0]
+$wsusPort = ( ( (Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate).WUServer -split '//')[1] -split ':' )[1]
+tnc $wsusAddress -port $wsusPort -InformationLevel Detailed
+
+# 6\ list cert info\
+# certlm.msc
+# gpresult /h c:\windows\temp\gpresult.html /scope computer
+# in pers store (along with templ names)
+Get-ChildItem "Cert:\LocalMachine\My" | `
+select Name, FriendlyName, Thumbprint, Issuer, EnhancedKeyUsageList, NotAfter | `
+ogv
+
+# in trusted root
+Get-ChildItem "Cert:\LocalMachine\Root" | `
+select Name, FriendlyName, Thumbprint, Issuer, EnhancedKeyUsageList, NotAfter | `
+ogv
+
+# 7\ open wsus test web pages
+Invoke-WebRequest "http://$($wsusAddress):8530/ClientWebService/Client.asmx" -UseBasicParsing
+Invoke-WebRequest "http://$($wsusAddress):8530/SelfUpdate/iuident.cab" -UseBasicParsing
+Invoke-WebRequest "http://$($wsusAddress):8530/SelfUpdate/wuident.cab" -UseBasicParsing
+
+# now here are the https tests (will need proper thumbprint from previous step)
+$ThumbPrint = "849b978fbcd91730015efbe31c397241ee3ba1cf"
+$Cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where {$_.Thumbprint -like $ThumbPrint}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest "http://$($wsusAddress):8531/ClientWebService/Client.asmx" -UseBasicParsing -Certificate $Cert -UseBasicParsing
+Invoke-WebRequest "http://$($wsusAddress):8531/SelfUpdate/iuident.cab" -UseBasicParsing -Certificate $Cert -UseBasicParsing
+Invoke-WebRequest "http://$($wsusAddress):8531/SelfUpdate/wuident.cab" -UseBasicParsing -Certificate $Cert -UseBasicParsing
+
+# 8\ check for 500 statemsgs (need unique updateid)
+#i.e. Microsoft 365 Apps Update - Monthly Enterprise Channel Extended Quality Update for x64 based Edition Version 2212 (Build 15928.20298)	3104046	0	0	0	Yes	Yes	0e7916d2-eecf-4346-a6af-9d8b038bbc93
+gwmi -ns ROOT\ccm\StateMsg -query 'select * from CCM_StateMsg where topicid like "%b5c69c07-71bd-4c95-9323-edd74bdd0bec%"' | `
+select topictype, stateid, topicid, messagetime, messagesent
+
+<# 
+500	STATE_TOPTCTYPE_SUM_UPDATE_DETECTION
+1	STATE_STATEID_UPDATE_NOT_REQUIRED
+2	STATE_STATEID_UPDATE_MISSING
+3	STATE_STATEID_UPDATE_INSTALLED
+#>
+
+# next is deployment statemsg
+# i.e Microsoft Software Updates - 2023-07-07 05:29:12 PM	Individual	All Systems	Yes	7/7/2023 5:31:00 PM	{9A129251-9A5E-448E-80CE-83F3A8C02EE4}	
+gwmi -ns ROOT\ccm\StateMsg -query 'select * from CCM_StateMsg where topicid like "%9A129251-9A5E-448E-80CE-83F3A8C02EE4%"' |`
+select topictype, stateid, topicid, messagetime, messagesent
+
+<#
+300	STATE_TOPICTYPE_SUM_ASSIGNMENT_COMPLIANCE
+
+	1	STATE_STATEID_ASSIGNMENT_COMPLIANT
+	2	STATE_STATEID_ASSIGNMENT_NONCOMPLIANT
+
+302	STATE_TOPICTYPE_SUM_ASSIGNMENT_EVALUATION
+
+	1	STATE_STATEID_ASSIGNMENT_EVALUATE_ACTIVATED
+	2	STATE_STATEID_ASSIGNMENT_EVALUATE_SUCCESS
+	3	STATE_STATEID_ASSIGNMENT_EVALUATE_FAILED
+#>
+
+# revert\ disable ccm verbose
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogLevel" -Value "1" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxSize" -Value "10485760" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\@GLOBAL' -Name "LogMaxHistory" -Value "10" -ErrorAction SilentlyContinue
+New-Item -Path "HKLM:\Software\Microsoft\CCM\Logging\DebugLogging" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\Software\Microsoft\CCM\Logging\DebugLogging' -Name "Enabled" -Value "False" -ErrorAction SilentlyContinue
+Stop-Service -Name CcmExec
+Start-Service -Name CcmExec

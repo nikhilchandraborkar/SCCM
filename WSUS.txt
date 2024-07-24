@@ -1,0 +1,17 @@
+#Refresh update state (Run in PowerShell ISE as an admin)
+Remove-Item $env:windir\system32\GroupPolicyUsers -Recurse -force
+Remove-Item $env:windir\system32\GroupPolicy -Recurse -force
+gpupdate /force
+Start-Sleep -Seconds 5
+Stop-Service -Name  wuauserv
+Stop-Service -Name bits
+Rename-Item C:\Windows\SoftwareDistribution  SoftwareDistribution.old
+Start-Service -Name wuauserv
+Start-Service -Name bits
+Start-Sleep -Seconds 5
+$SCCMUpdatesStore = New-Object -ComObject Microsoft.CCM.UpdatesStore
+$SCCMUpdatesStore.RefreshServerComplianceState()
+([wmiclass]'ROOT\ccm:SMS_Client').TriggerSchedule('{00000000-0000-0000-0000-000000000113}')
+([wmiclass]'ROOT\ccm:SMS_Client').TriggerSchedule('{00000000-0000-0000-0000-000000000108}')
+([wmiclass]'ROOT\ccm:SMS_Client').TriggerSchedule('{00000000-0000-0000-0000-000000000001}')
+([wmiclass]'ROOT\ccm:SMS_Client').TriggerSchedule('{00000000-0000-0000-0000-000000000111}')
